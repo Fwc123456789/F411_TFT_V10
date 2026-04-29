@@ -1,0 +1,111 @@
+# Git ignore 规则 - STM32 Keil/CubeIDE 项目
+
+## Keil MDK 生成文件
+MDK-ARM/F411_TFT_V2/**/*.o
+MDK-ARM/F411_TFT_V2/**/*.d
+MDK-ARM/F411_TFT_V2/**/*.a
+MDK-ARM/F411_TFT_V2/*.axf
+MDK-ARM/F411_TFT_V2/*.htm
+MDK-ARM/F411_TFT_V2/*.sct
+MDK-ARM/F411_TFT_V2/*.lnp
+MDK-ARM/F411_TFT_V2/*.dep
+MDK-ARM/F411_TFT_V2/DebugConfig/
+MDK-ARM/F411_TFT_V2.uvguix.*
+MDK-ARM/*.uvguix.*
+
+## STM32CubeIDE 生成文件
+.cproject
+.project
+.settings/
+Debug/
+Release/
+*.launch
+
+## 编译输出
+/build/
+/Debug/
+/Release/
+*.elf
+*.hex
+*.bin
+*.map
+*.lst
+*.o
+*.a
+*.d
+
+## IDE 文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+## Python 相关（如果有脚本）
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+## 系统文件
+Thumbs.db
+.DS_Store
+*.bak
+*.tmp
+*.log
+
+## Backup 文件
+*.backup
+*.bak
+*~
+*.swp
+*.orig
+
+## STM32CubeMX 生成的中间文件
+STM32Cube**/
+.mxproject
+*.ioc.bak
+
+## 其他编辑器临时文件
+*.sublime-project
+*.sublime-workspace
+.vscode/settings.json
+
+## Tag 文件
+tags
+.ctags
+
+## 敏感信息（如密码、token等）
+config_secret.h
+secrets.h
+*.key
+*.pem
+
+## 大型二进制文件（如果不需要版本控制）
+*.rar
+*.zip
+*.7z
+*.iso
+
+## 硬件设计文件（可选，根据需要保留或排除）
+# *.pcb
+# *.sch
+# *.kicad_*
+
+## 文档生成
+docs/_build/
+site/
+
+## 临时编译文件
+.Xil/
+.xilinx/
+vivado_*.jou
+vivado_*.log
+
+## 特定的 Keil 项目文件
+RTE/_*_/
