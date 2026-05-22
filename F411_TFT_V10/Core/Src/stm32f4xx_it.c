@@ -228,5 +228,12 @@ void DMA2_Stream2_IRQHandler(void)
 }
 
 /* USER CODE BEGIN 1 */
+#include "TFT.h"
 
+void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+    if (hspi->Instance == SPI1) {
+        tft_spi_dma_busy = 0;
+    }
+}
 /* USER CODE END 1 */

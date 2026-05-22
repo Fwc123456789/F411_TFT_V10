@@ -1,44 +1,48 @@
 #include "TFT.h"
- 
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+
  
 /* at least 240*2 and can be divided wholely by 240*240*2 */
 #define ST7789_BUF_SIZE (240 * 2)
 uint8_t ST7789_Buf[ST7789_BUF_SIZE];
  
- // ÔÚTFT.hÖÐÌí¼Ó
+ // ï¿½ï¿½TFT.hï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 #define USE_DMA_DOUBLE_BUFFER 1
 #define DMA_BUFFER_SIZE 1024
 
-// ÔÚTFT.cÖÐÐÞ¸Ä
+// ï¿½ï¿½TFT.cï¿½ï¿½ï¿½Þ¸ï¿½
 static uint8_t dma_buffer1[DMA_BUFFER_SIZE];
 static uint8_t dma_buffer2[DMA_BUFFER_SIZE];
 static volatile uint8_t active_buffer = 0;
-static volatile uint8_t dma_busy = 0;
+volatile uint8_t tft_spi_dma_busy = 0;
 
 void ST7789_DMA_Complete_Callback(void)
 {
-    dma_busy = 0;
+		tft_spi_dma_busy = 0;
+	
     active_buffer = !active_buffer;
 }
 
 void ST7789_SendMultiByte_DMA(uint8_t* data, uint16_t len)
 {
-    while (dma_busy) {
-        // µÈ´ýÇ°Ò»¸öDMA´«ÊäÍê³É
-        // ¿ÉÒÔÔÚÕâÀïÖ´ÐÐÆäËûÈÎÎñ
+    while (tft_spi_dma_busy) {
+        // ï¿½È´ï¿½Ç°Ò»ï¿½ï¿½DMAï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     }
     
-    dma_busy = 1;
+    tft_spi_dma_busy = 1;
     
     if (len > DMA_BUFFER_SIZE) {
-        // ´óÊý¾Ý·Ö¿é´«Êä
+        // ï¿½ï¿½ï¿½ï¿½ï¿½Ý·Ö¿é´«ï¿½ï¿½
         uint16_t remaining = len;
         uint16_t offset = 0;
         
         while (remaining > 0) {
             uint16_t chunk_size = (remaining > DMA_BUFFER_SIZE) ? DMA_BUFFER_SIZE : remaining;
             
-            // ¸´ÖÆÊý¾Ýµ½µ±Ç°»º³åÇø
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ýµï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             memcpy(active_buffer ? dma_buffer1 : dma_buffer2, data + offset, chunk_size);
             
             ST7789_CS_LOW();
@@ -46,7 +50,7 @@ void ST7789_SendMultiByte_DMA(uint8_t* data, uint16_t len)
             
             HAL_SPI_Transmit_DMA(ST7789_SPI, active_buffer ? dma_buffer1 : dma_buffer2, chunk_size);
             
-            // µÈ´ý´«ÊäÍê³É
+            // ï¿½È´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             while (HAL_SPI_GetState(ST7789_SPI) == HAL_SPI_STATE_BUSY_TX);
             
             ST7789_CS_HIGH();
@@ -55,7 +59,7 @@ void ST7789_SendMultiByte_DMA(uint8_t* data, uint16_t len)
             remaining -= chunk_size;
         }
     } else {
-        // Ð¡Êý¾ÝÖ±½Ó´«Êä
+        // Ð¡ï¿½ï¿½ï¿½ï¿½Ö±ï¿½Ó´ï¿½ï¿½ï¿½
         memcpy(active_buffer ? dma_buffer1 : dma_buffer2, data, len);
         
         ST7789_CS_LOW();
@@ -63,22 +67,22 @@ void ST7789_SendMultiByte_DMA(uint8_t* data, uint16_t len)
         
         HAL_SPI_Transmit_DMA(ST7789_SPI, active_buffer ? dma_buffer1 : dma_buffer2, len);
         
-        // µÈ´ý´«ÊäÍê³É
+        // ï¿½È´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         while (HAL_SPI_GetState(ST7789_SPI) == HAL_SPI_STATE_BUSY_TX);
         
         ST7789_CS_HIGH();
     }
     
-    dma_busy = 0;
+    tft_spi_dma_busy = 0;
     active_buffer = !active_buffer;
 }
 
-// ÐÞ¸ÄST7789_SendMultiByteº¯Êý
+// ï¿½Þ¸ï¿½ST7789_SendMultiByteï¿½ï¿½ï¿½ï¿½
 void ST7789_SendMultiByte(uint8_t* dat, uint16_t len)
 {
-    if (len > 64) { // ¶ÔÓÚ´óÊý¾ÝÊ¹ÓÃDMA
+    if (len > 64) { // ï¿½ï¿½ï¿½Ú´ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½DMA
         ST7789_SendMultiByte_DMA(dat, len);
-    } else { // Ð¡Êý¾ÝÊ¹ÓÃ×èÈû´«Êä
+    } else { // Ð¡ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         ST7789_CS_LOW();
         ST7789_DC_HIGH();
         HAL_SPI_Transmit(ST7789_SPI, dat, len, HAL_MAX_DELAY);
@@ -228,12 +232,12 @@ void ST7789_Init(void)
 //   ST7789_SendByte(0x00, ST7789_DATA);
 //   ST7789_SendByte(0xEF, ST7789_DATA); //239
 	 
-	 // ÐÞ¸ÄÎª240x320µÄÐÐµØÖ·ÉèÖÃ£¨0~319£©
+	 // ï¿½Þ¸ï¿½Îª240x320ï¿½ï¿½ï¿½Ðµï¿½Ö·ï¿½ï¿½ï¿½Ã£ï¿½0~319ï¿½ï¿½
 ST7789_SendByte(0x2B, ST7789_CMD); //Row Address Set
 ST7789_SendByte(0x00, ST7789_DATA);
-ST7789_SendByte(0x00, ST7789_DATA); //ÆðÊ¼ÐÐ£º0
-ST7789_SendByte(0x01, ST7789_DATA); //½áÊøÐÐ¸ßÎ»£¨0x01 = 256£©
-ST7789_SendByte(0x3F, ST7789_DATA); //½áÊøÐÐµÍÎ»£¨0x3F = 63£¬256+63=319£©
+ST7789_SendByte(0x00, ST7789_DATA); //ï¿½ï¿½Ê¼ï¿½Ð£ï¿½0
+ST7789_SendByte(0x01, ST7789_DATA); //ï¿½ï¿½ï¿½ï¿½ï¿½Ð¸ï¿½Î»ï¿½ï¿½0x01 = 256ï¿½ï¿½
+ST7789_SendByte(0x3F, ST7789_DATA); //ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½Î»ï¿½ï¿½0x3F = 63ï¿½ï¿½256+63=319ï¿½ï¿½
  
    ST7789_SendByte(0x29, ST7789_CMD);
 }
@@ -242,48 +246,48 @@ void ST7789_Address_Set(uint16_t x1,uint16_t y1,uint16_t x2,uint16_t y2)
 {
 	if(ST7789_ROTATION==0)
 	{
-		ST7789_SendByte(0x2a, ST7789_CMD);//ÁÐµØÖ·ÉèÖÃ
+		ST7789_SendByte(0x2a, ST7789_CMD);//ï¿½Ðµï¿½Ö·ï¿½ï¿½ï¿½ï¿½
 		ST7789_SendHalfWord(x1);
 		ST7789_SendHalfWord(x2);
-		ST7789_SendByte(0x2b, ST7789_CMD);//ÐÐµØÖ·ÉèÖÃ
+		ST7789_SendByte(0x2b, ST7789_CMD);//ï¿½Ðµï¿½Ö·ï¿½ï¿½ï¿½ï¿½
 		ST7789_SendHalfWord(y1);
 		ST7789_SendHalfWord(y2);
-		ST7789_SendByte(0x2c, ST7789_CMD);//´¢´æÆ÷Ð´
+		ST7789_SendByte(0x2c, ST7789_CMD);//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð´
 	}
 	else if(ST7789_ROTATION == 90)
 	{
       
-		ST7789_SendByte(0x2a, ST7789_CMD);//ÁÐµØÖ·ÉèÖÃ
+		ST7789_SendByte(0x2a, ST7789_CMD);//ï¿½Ðµï¿½Ö·ï¿½ï¿½ï¿½ï¿½
 		ST7789_SendHalfWord(x1);
 		ST7789_SendHalfWord(x2);
-		ST7789_SendByte(0x2b, ST7789_CMD);//ÐÐµØÖ·ÉèÖÃ
+		ST7789_SendByte(0x2b, ST7789_CMD);//ï¿½Ðµï¿½Ö·ï¿½ï¿½ï¿½ï¿½
 		ST7789_SendHalfWord(y1);
 		ST7789_SendHalfWord(y2);
-		ST7789_SendByte(0x2c, ST7789_CMD);//´¢´æÆ÷Ð´
+		ST7789_SendByte(0x2c, ST7789_CMD);//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð´
 	}
 	else if(ST7789_ROTATION == 180)
 	{
 //      y1 += 80;
 //	   y2 += 80;
-		ST7789_SendByte(0x2a, ST7789_CMD);//ÁÐµØÖ·ÉèÖÃ
+		ST7789_SendByte(0x2a, ST7789_CMD);//ï¿½Ðµï¿½Ö·ï¿½ï¿½ï¿½ï¿½
 		ST7789_SendHalfWord(x1);
 		ST7789_SendHalfWord(x2);
-		ST7789_SendByte(0x2b, ST7789_CMD);//ÐÐµØÖ·ÉèÖÃ
+		ST7789_SendByte(0x2b, ST7789_CMD);//ï¿½Ðµï¿½Ö·ï¿½ï¿½ï¿½ï¿½
 		ST7789_SendHalfWord(y1);
 		ST7789_SendHalfWord(y2);
-		ST7789_SendByte(0x2c, ST7789_CMD);//´¢´æÆ÷Ð´
+		ST7789_SendByte(0x2c, ST7789_CMD);//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð´
 	}
 	else if(ST7789_ROTATION == 270)
 	{
 //      x1 += 80;
 //      x2 += 80;
-		ST7789_SendByte(0x2a, ST7789_CMD);//ÁÐµØÖ·ÉèÖÃ
+		ST7789_SendByte(0x2a, ST7789_CMD);//ï¿½Ðµï¿½Ö·ï¿½ï¿½ï¿½ï¿½
 		ST7789_SendHalfWord(x1);
 		ST7789_SendHalfWord(x2);
-		ST7789_SendByte(0x2b, ST7789_CMD);//ÐÐµØÖ·ÉèÖÃ
+		ST7789_SendByte(0x2b, ST7789_CMD);//ï¿½Ðµï¿½Ö·ï¿½ï¿½ï¿½ï¿½
 		ST7789_SendHalfWord(y1);
 		ST7789_SendHalfWord(y2);
-		ST7789_SendByte(0x2c, ST7789_CMD);//´¢´æÆ÷Ð´
+		ST7789_SendByte(0x2c, ST7789_CMD);//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð´
 	}
    else
    {
@@ -308,14 +312,14 @@ void ST7789_Clear(uint16_t color)
  
 void ST7789_DrawPixel(uint16_t x,uint16_t y,uint16_t color)
 {
-   ST7789_Address_Set(x,y,x,y);//ÉèÖÃ¹â±êÎ»ÖÃ 
+   ST7789_Address_Set(x,y,x,y);//ï¿½ï¿½ï¿½Ã¹ï¿½ï¿½Î»ï¿½ï¿½ 
    ST7789_SendHalfWord(color);
 }
  
 void ST7789_DrawHLine(uint16_t xs, uint16_t xe,uint16_t y,uint16_t color)
 {
    uint16_t i,j;
-   ST7789_Address_Set(xs,y,xe,y);//ÉèÖÃ¹â±êÎ»ÖÃ 
+   ST7789_Address_Set(xs,y,xe,y);//ï¿½ï¿½ï¿½Ã¹ï¿½ï¿½Î»ï¿½ï¿½ 
  
  
    for ( i = 0; i < (xe - xs + 1) * 2; i += 2)
@@ -331,7 +335,7 @@ void ST7789_DrawHLine(uint16_t xs, uint16_t xe,uint16_t y,uint16_t color)
 //void ST7789_DrawVLine(uint16_t ys, uint16_t ye, uint16_t x, uint16_t color)
 //{
 //   uint16_t i,j;
-//   ST7789_Address_Set(x,ys,x,ye);//ÉèÖÃ¹â±êÎ»ÖÃ 
+//   ST7789_Address_Set(x,ys,x,ye);//ï¿½ï¿½ï¿½Ã¹ï¿½ï¿½Î»ï¿½ï¿½ 
 // 
 //   for ( i = 0; i < (ye - ys + 1) * 2; i += 2)
 //   {
@@ -343,12 +347,12 @@ void ST7789_DrawHLine(uint16_t xs, uint16_t xe,uint16_t y,uint16_t color)
 
 //void ST7789_DrawHLine(uint16_t xs, uint16_t xe, uint16_t y, uint16_t color)
 //{
-//    // È·±£×ø±êÔÚÓÐÐ§·¶Î§ÄÚ
+//    // È·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½Î§ï¿½ï¿½
 //    if (y >= ST7789_HEIGHT) return;
 //    if (xs >= ST7789_WIDTH) return;
 //    if (xe >= ST7789_WIDTH) xe = ST7789_WIDTH - 1;
 //    if (xs > xe) {
-//        // ½»»»ÆðµãºÍÖÕµã
+//        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õµï¿½
 //        uint16_t temp = xs;
 //        xs = xe;
 //        xe = temp;
@@ -356,22 +360,22 @@ void ST7789_DrawHLine(uint16_t xs, uint16_t xe,uint16_t y,uint16_t color)
 //    
 //    uint16_t length = xe - xs + 1;
 //    
-//    // È·±£³¤¶È²»³¬¹ý»º³åÇøÈÝÁ¿
+//    // È·ï¿½ï¿½ï¿½ï¿½ï¿½È²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //    if (length > (ST7789_BUF_SIZE / 2)) {
 //        length = ST7789_BUF_SIZE / 2;
 //        xe = xs + length - 1;
 //    }
 //    
-//    ST7789_Address_Set(xs, y, xe, y);  // ÉèÖÃ¹â±êÎ»ÖÃ
+//    ST7789_Address_Set(xs, y, xe, y);  // ï¿½ï¿½ï¿½Ã¹ï¿½ï¿½Î»ï¿½ï¿½
 //    
-//    // Ìî³ä»º³åÇø
+//    // ï¿½ï¿½ä»ºï¿½ï¿½ï¿½ï¿½
 //    for (uint16_t i = 0; i < length * 2; i += 2)
 //    {
 //        ST7789_Buf[i] = color >> 8;
 //        ST7789_Buf[i + 1] = color & 0xFF;
 //    }
 //    
-//    // ·¢ËÍÊý¾Ý
+//    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //    ST7789_SendMultiByte(ST7789_Buf, length * 2);
 //}
 
@@ -379,31 +383,31 @@ void ST7789_DrawVLine(uint16_t ys, uint16_t ye, uint16_t x, uint16_t color)
 {
    uint16_t i, j;
    uint32_t length = ye - ys + 1;
-   ST7789_Address_Set(x, ys, x, ye);   // ÉèÖÃÇøÓòÎª´Ó(x,ys)µ½(x,ye)
+   ST7789_Address_Set(x, ys, x, ye);   // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½(x,ys)ï¿½ï¿½(x,ye)
 
-   // È·±£×ø±êÓÐÐ§
+   // È·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð§
    if (ys > ye) return;
    if (x >= ST7789_WIDTH) return;
    if (ye >= ST7789_HEIGHT) ye = ST7789_HEIGHT - 1;
 
-   // ×¼±¸ÑÕÉ«Êý¾Ý£¨2×Ö½Ú/ÏñËØ£©
+   // ×¼ï¿½ï¿½ï¿½ï¿½É«ï¿½ï¿½ï¿½Ý£ï¿½2ï¿½Ö½ï¿½/ï¿½ï¿½ï¿½Ø£ï¿½
    uint8_t colorData[2] = {color >> 8, color & 0xFF};
 
-   // ·Ö¿é·¢ËÍÊý¾Ý
+   // ï¿½Ö¿é·¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
    for (i = 0; i < length; i += (ST7789_BUF_SIZE/2)) 
    {
       uint16_t chunkSize = (length - i) > (ST7789_BUF_SIZE/2) ? 
                           (ST7789_BUF_SIZE/2) : 
                           (length - i);
       
-      // Ìî³ä»º³åÇø
+      // ï¿½ï¿½ä»ºï¿½ï¿½ï¿½ï¿½
       for (j = 0; j < chunkSize; j++) 
       {
           ST7789_Buf[j * 2] = colorData[0];
           ST7789_Buf[j * 2 + 1] = colorData[1];
       }
       
-      // ·¢ËÍÊý¾Ý¿é
+      // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¿ï¿½
       ST7789_SendMultiByte(ST7789_Buf, chunkSize * 2);
    }
 }
@@ -413,7 +417,7 @@ void ST7789_FillRect(uint16_t xs, uint16_t ys, uint16_t xe, uint16_t ye, uint16_
    uint16_t i,j;
    uint32_t depth;
    depth = (ye - ys + 1) * (xe - xs + 1) * 2;
-   ST7789_Address_Set(xs, ys, xe, ye);//ÉèÖÃ¹â±êÎ»ÖÃ 
+   ST7789_Address_Set(xs, ys, xe, ye);//ï¿½ï¿½ï¿½Ã¹ï¿½ï¿½Î»ï¿½ï¿½ 
  
    if (depth < ST7789_BUF_SIZE)
    {
@@ -454,7 +458,7 @@ void ST7789_FillRect(uint16_t xs, uint16_t ys, uint16_t xe, uint16_t ye, uint16_
 void ST7789_DrawBitLine16BPP(uint16_t xs, uint16_t y, uint8_t const * p, uint16_t xsize)
 {
    uint16_t i,j;
-   ST7789_Address_Set(xs, y, xs + xsize - 1, y);//ÉèÖÃ¹â±êÎ»ÖÃ 
+   ST7789_Address_Set(xs, y, xs + xsize - 1, y);//ï¿½ï¿½ï¿½Ã¹ï¿½ï¿½Î»ï¿½ï¿½ 
    for ( i = 0; i < xsize * 2; i+=2)
    {
       // ST7789_Buf[i] = *(p + i) >> 8;
@@ -530,25 +534,25 @@ void ST7789_ShowString(uint16_t x, uint16_t y, const char *str, FontDef font, ui
 }
 
 
-// ÏÔÊ¾ÕûÊý
+// ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½
 void ST7789_ShowInt(uint16_t x, uint16_t y, int num, FontDef font, uint16_t color, uint16_t bgcolor)
 {
-    char buffer[12];  // ×ã¹»´æ´¢ÕûÊý
+    char buffer[12];  // ï¿½ã¹»ï¿½æ´¢ï¿½ï¿½ï¿½ï¿½
     snprintf(buffer, sizeof(buffer), "%d", num);
     ST7789_ShowString(x, y, buffer, font, color, bgcolor);
 }
 
-// ÏÔÊ¾¸¡µãÊý
+// ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 void ST7789_ShowFloat(uint16_t x, uint16_t y, float num, uint8_t decimals, FontDef font, uint16_t color, uint16_t bgcolor)
 {
-    char buffer[20];  // ×ã¹»´æ´¢¸¡µãÊý
+    char buffer[20];  // ï¿½ã¹»ï¿½æ´¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     char format[10];
     snprintf(format, sizeof(format), "%%.%df", decimals);
     snprintf(buffer, sizeof(buffer), format, num);
     ST7789_ShowString(x, y, buffer, font, color, bgcolor);
 }
 
-// »æÖÆÖ±Ïßº¯Êý
+// ï¿½ï¿½ï¿½ï¿½Ö±ï¿½ßºï¿½ï¿½ï¿½
 void ST7789_DrawLine(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t color) {
     int16_t dx = abs(x2 - x1);
     int16_t dy = abs(y2 - y1);
